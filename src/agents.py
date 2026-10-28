@@ -17,8 +17,14 @@ class QLearningAgent:
         self.q = {}
 
     def key(self, state):
-        clipped = np.clip(np.asarray(state), 0, 2.5)
-        return tuple(np.minimum((clipped / 2.5 * self.bins).astype(int), self.bins - 1))
+        # A compact, interpretable tabular state. Keeping only the variables
+        # most relevant to replenishment prevents an impractically sparse
+        # 9-dimensional Q-table.
+        s = np.asarray(state)
+        inventory_position = int(np.clip((s[0] + s[1]) * self.bins, 0, self.bins * 2 - 1))
+        demand_average = int(np.clip(s[5] / 2.5 * self.bins, 0, self.bins - 1))
+        promotion = int(s[7] >= 0.5)
+        return inventory_position, demand_average, promotion
 
     def values(self, state):
         key = self.key(state)

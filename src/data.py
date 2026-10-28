@@ -4,6 +4,38 @@ import numpy as np
 import pandas as pd
 
 
+DEFAULT_KAGGLE_DATASET = "atomicd/retail-store-inventory-and-demand-forecasting"
+
+
+def download_kaggle_dataset(handle: str = DEFAULT_KAGGLE_DATASET) -> str:
+    """Download a Kaggle dataset and return its largest CSV file.
+
+    KaggleHub is already authenticated inside Kaggle notebooks.  Selecting the
+    largest CSV avoids accidentally choosing a small metadata/sample file when
+    a dataset version contains more than one CSV.
+    """
+    try:
+        import kagglehub
+    except ImportError as exc:
+        raise RuntimeError("Install KaggleHub first: pip install kagglehub") from exc
+
+    from pathlib import Path
+
+    dataset_dir = Path(kagglehub.dataset_download(handle))
+    csv_files = list(dataset_dir.rglob("*.csv"))
+    if not csv_files:
+        available = [str(p.relative_to(dataset_dir)) for p in dataset_dir.rglob("*") if p.is_file()]
+        raise FileNotFoundError(
+            f"Dataset {handle!r} downloaded to {dataset_dir}, but it contains no CSV. "
+            f"Files found: {available[:20]}"
+        )
+    selected = max(csv_files, key=lambda path: path.stat().st_size)
+    print(f"Downloaded Kaggle dataset: {handle}")
+    print(f"Dataset directory: {dataset_dir}")
+    print(f"Selected CSV: {selected}")
+    return str(selected)
+
+
 def synthetic_data(days=900, seed=42):
     rng = np.random.default_rng(seed)
     t = np.arange(days)

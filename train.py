@@ -8,7 +8,7 @@ import argparse, json, os, random
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from src.data import load_retail_data
+from src.data import DEFAULT_KAGGLE_DATASET, download_kaggle_dataset, load_retail_data
 from src.inventory_env import InventoryEnv, InventoryConfig
 from src.agents import QLearningAgent, DQNAgent
 
@@ -25,11 +25,10 @@ def train_q(env, episodes):
     agent = QLearningAgent(env.action_size)
     rewards = []
     for _ in range(episodes):
-        total, _ = run_policy(env, agent, True)
-        # replay one more episode while updating action values
-        state = env.reset(); done = False
+        state = env.reset(); done = False; total = 0.0
         while not done:
-            a = agent.act(state, True); nxt, r, done, _ = env.step(a); agent.learn(state, a, r, nxt, done); state = nxt
+            a = agent.act(state, True); nxt, r, done, _ = env.step(a)
+            agent.learn(state, a, r, nxt, done); state = nxt; total += r
         agent.decay(); rewards.append(total)
     return agent, rewards
 
@@ -56,7 +55,8 @@ def reorder_point_policy(env):
 
 def metrics(name, reward, log):
     demand, sales = log.demand.sum(), log.sales.sum()
-    return {"method": name, "total_reward": round(reward, 2), "fill_rate": round(float(sales / max(demand, 1)), 4),
+    return {"method": name, "total_reward": round(reward, 2), "total_profit": round(float(log.profit.sum()), 2),
+            "fill_rate": round(float(sales / max(demand, 1)), 4),
             "stockout_rate": round(float(log.lost_sales.sum() / max(demand, 1)), 4),
             "average_inventory": round(float(log.inventory.mean()), 2), "total_order_cost": round(float(log.order_cost.sum()), 2)}
 
@@ -64,11 +64,23 @@ def metrics(name, reward, log):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--data-path"); p.add_argument("--product-id"); p.add_argument("--store-id")
+    p.add_argument(
+        "--kaggle-dataset",
+        nargs="?",
+        const=DEFAULT_KAGGLE_DATASET,
+        help=("Download a Kaggle dataset automatically. Pass this flag without a value "
+              f"to use {DEFAULT_KAGGLE_DATASET!r}."),
+    )
     p.add_argument("--output-dir", default="outputs"); p.add_argument("--q-episodes", type=int, default=450); p.add_argument("--dqn-episodes", type=int, default=220)
     p.add_argument("--lead-time", type=int, default=2); p.add_argument("--seed", type=int, default=42)
     args = p.parse_args(); random.seed(args.seed); np.random.seed(args.seed)
     os.makedirs(args.output_dir, exist_ok=True)
-    data, source = load_retail_data(args.data_path, args.product_id, args.store_id)
+    data_path = args.data_path
+    if args.kaggle_dataset:
+        if data_path:
+            p.error("Use either --data-path or --kaggle-dataset, not both.")
+        data_path = download_kaggle_dataset(args.kaggle_dataset)
+    data, source = load_retail_data(data_path, args.product_id, args.store_id)
     n = len(data); train_end, test_start = int(n * .70), int(n * .85)
     train, test = data.iloc[:train_end], data.iloc[test_start:]
     cfg = InventoryConfig(lead_time=args.lead_time)

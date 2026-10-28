@@ -15,12 +15,18 @@ The dataset is used to replay actual demand; it is **not** used as a prediction 
 ## Environment design
 
 - **State:** inventory on hand, outstanding/pipeline orders, 3 recent demand values, 7-day demand mean, normalized price, promotion, and weekday.
-- **Actions:** order 0, 5, 10, ..., 50 units per day.
+- **Actions:** 11 discrete order quantities from zero to roughly two days of
+  mean demand. Quantities scale automatically to the selected product.
 - **Lead time:** default two days (configurable).
-- **Reward:** sales margin - ordering cost - holding cost - lost-sales penalty.
+- **Reward:** sales revenue - ordering cost - holding cost - lost-sales penalty,
+  normalized for stable learning. Raw monetary profit is reported separately.
 - **Episode:** a chronological demand sequence. The final 15% of observations is never used for training and is reserved for testing.
 
 ## Kaggle instructions
+
+For the shortest workflow, open [`KAGGLE_CELLS.md`](KAGGLE_CELLS.md) and copy
+its cells into a new Kaggle notebook. The project can now download the exact
+dataset automatically, so manually adding an Input is optional.
 
 1. Create a new Kaggle Notebook and enable **GPU T4 x2** only if you want faster DQN training. CPU is sufficient for the default settings.
 2. Add a CSV dataset to the notebook. The recommended choice is Kaggle's *Retail Store Inventory and Demand Forecasting* dataset.
@@ -46,6 +52,13 @@ The dataset is used to replay actual demand; it is **not** used as a prediction 
   --q-episodes 450 \
   --dqn-episodes 220 \
   --output-dir /kaggle/working/results
+```
+
+Or skip manual dataset attachment entirely and let KaggleHub download the
+recommended `atomicd` dataset:
+
+```python
+!python train.py --kaggle-dataset --q-episodes 450 --dqn-episodes 220 --output-dir /kaggle/working/results
 ```
 
 If the data has more than one product and store, select one pair first:

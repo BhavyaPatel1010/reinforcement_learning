@@ -17,13 +17,14 @@ class InventoryConfig:
     lead_time: int = 2
     initial_inventory_days: float = 4.0
     max_inventory_days: float = 12.0
-    order_step: int = 5
+    # None scales the action quantities to the selected product's demand.
+    order_step: int | None = None
     n_actions: int = 11
     holding_cost_rate: float = 0.015
     stockout_penalty_rate: float = 0.75
     unit_order_cost_rate: float = 0.55
     fixed_order_cost: float = 2.0
-    gross_margin_rate: float = 0.35
+    sales_revenue_rate: float = 1.0
 
 
 class InventoryEnv:
@@ -40,8 +41,13 @@ class InventoryEnv:
             raise ValueError("demand, prices, and promotions must have the same length.")
         self.config = config or InventoryConfig()
         self.mean_demand = max(float(np.mean(self.demand)), 1.0)
+        self.mean_price = max(float(np.mean(self.prices)), 0.01)
+        self.reward_scale = self.mean_demand * self.mean_price
         self.max_inventory = self.config.max_inventory_days * self.mean_demand
-        self.action_values = np.arange(self.config.n_actions, dtype=np.float32) * self.config.order_step
+        # With 11 actions this makes the largest order roughly two days of mean
+        # demand, whether the item sells 5 or 500 units per day.
+        self.order_step = self.config.order_step or max(1, round(self.mean_demand / 5))
+        self.action_values = np.arange(self.config.n_actions, dtype=np.float32) * self.order_step
         self.reset()
 
     @property
@@ -98,14 +104,17 @@ class InventoryEnv:
         self.inventory -= sales
         self.history.append(demand)
 
-        revenue_margin = sales * price * self.config.gross_margin_rate
+        sales_revenue = sales * price * self.config.sales_revenue_rate
         order_cost = order_qty * price * self.config.unit_order_cost_rate + (self.config.fixed_order_cost if order_qty else 0.0)
         holding_cost = self.inventory * price * self.config.holding_cost_rate
         stockout_cost = lost_sales * price * self.config.stockout_penalty_rate
-        reward = revenue_margin - order_cost - holding_cost - stockout_cost
+        profit = sales_revenue - order_cost - holding_cost - stockout_cost
+        # Normalization keeps DQN targets numerically stable across cheap and
+        # expensive products while preserving the optimal policy.
+        reward = profit / self.reward_scale
         info = {"demand": demand, "sales": sales, "lost_sales": lost_sales, "order_qty": order_qty,
-                "inventory": self.inventory, "revenue_margin": revenue_margin, "order_cost": order_cost,
-                "holding_cost": holding_cost, "stockout_cost": stockout_cost}
+                "inventory": self.inventory, "sales_revenue": sales_revenue, "order_cost": order_cost,
+                "holding_cost": holding_cost, "stockout_cost": stockout_cost, "profit": profit}
         self.t += 1
         done = self.t >= self.end_index
         return self._state(), float(reward), done, info
