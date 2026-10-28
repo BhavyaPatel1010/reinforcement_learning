@@ -18,7 +18,11 @@ inventory capacity, and order quantities are fitted on training data and reused
 unchanged for validation and test. Learning curves use actual episode counts.
 
 Outputs now also include `dqn_model.pt`, `q_table.json`, and per-episode training
-CSVs. Use a new output folder when comparing with an earlier run. Old reported
+CSVs. The training command also generates report-ready comparison, operations,
+cumulative-outcome, order-distribution, and smoothed-learning-curve figures; a
+written `REPORT_SUMMARY.md`; an artifact manifest; and a ZIP archive beside the
+output folder. For example, `--output-dir /kaggle/working/improved_results`
+creates `/kaggle/working/improved_results.zip`. Use a new output folder when comparing with an earlier run. Old reported
 results are not directly comparable because the previous evaluation computed
 scales from the test period itself. Run several seeds before claiming a robust
 performance improvement.

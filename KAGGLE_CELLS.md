@@ -46,7 +46,7 @@ demand, so no manual inventory tuning is required.
     --q-episodes 450 \
     --dqn-episodes 220 \
     --lead-time 2 \
-    --output-dir /kaggle/working/results
+    --output-dir /kaggle/working/improved_results
 ```
 
 ## Cell 5 — show the comparison and training curve
@@ -55,9 +55,16 @@ demand, so no manual inventory tuning is required.
 import pandas as pd
 from IPython.display import Image, display
 
-results = pd.read_csv("/kaggle/working/results/comparison_metrics.csv")
+results = pd.read_csv("/kaggle/working/improved_results/comparison_metrics.csv")
 display(results)
-display(Image("/kaggle/working/results/training_rewards.png"))
+for figure in [
+    "policy_comparison.png",
+    "dqn_daily_operations.png",
+    "cumulative_outcomes.png",
+    "order_quantity_distribution.png",
+    "learning_curves_smoothed.png",
+]:
+    display(Image(f"/kaggle/working/improved_results/{figure}"))
 ```
 
 ## Cell 6 — plot the DQN decisions
@@ -65,7 +72,7 @@ display(Image("/kaggle/working/results/training_rewards.png"))
 ```python
 import matplotlib.pyplot as plt
 
-dqn = pd.read_csv("/kaggle/working/results/dqn_daily_log.csv")
+dqn = pd.read_csv("/kaggle/working/improved_results/dqn_daily_log.csv")
 plt.figure(figsize=(15, 6))
 plt.plot(dqn["demand"], label="Demand")
 plt.plot(dqn["inventory"], label="Remaining inventory")
@@ -78,10 +85,19 @@ plt.grid(alpha=0.3)
 plt.show()
 ```
 
-## Cell 7 — package results for submission
+## Cell 7 — verify and download the automatically created report package
 
 ```python
-!cd /kaggle/working && zip -r grocery_rl_results.zip results
+from pathlib import Path
+from IPython.display import FileLink, display
+
+archive = Path("/kaggle/working/improved_results.zip")
+print("Archive exists:", archive.exists())
+print("Archive size:", f"{archive.stat().st_size / 1024 / 1024:.2f} MB" if archive.exists() else "missing")
+display(FileLink(str(archive)))
 ```
 
-Finally select **Save Version → Save & Run All** in Kaggle.
+The training command creates the ZIP automatically after every successful run.
+Click the displayed link to download it immediately. Finally select
+**Save Version → Save & Run All** in Kaggle; interactive `/kaggle/working`
+files are lost if the session is reloaded before a version is saved.
