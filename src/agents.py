@@ -84,9 +84,13 @@ class DQNAgent:
         dones = t.tensor(dones, dtype=t.float32, device=self.device).unsqueeze(1)
         current = self.net(states).gather(1, actions)
         with t.no_grad():
-            target = rewards + self.gamma * (1 - dones) * self.target(next_states).max(dim=1, keepdim=True).values
+            # Double DQN: separate action selection from target evaluation.
+            next_actions = self.net(next_states).argmax(dim=1, keepdim=True)
+            target = rewards + self.gamma * (1 - dones) * self.target(next_states).gather(1, next_actions)
         loss = self.loss(current, target)
-        self.optimizer.zero_grad(); loss.backward(); self.optimizer.step()
+        self.optimizer.zero_grad(); loss.backward()
+        t.nn.utils.clip_grad_norm_(self.net.parameters(), 10.0)
+        self.optimizer.step()
         self.steps += 1
         if self.steps % 250 == 0:
             self.target.load_state_dict(self.net.state_dict())

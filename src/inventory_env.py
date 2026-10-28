@@ -31,7 +31,8 @@ class InventoryEnv:
     """Discrete-action, finite-horizon environment without a Gym dependency."""
 
     def __init__(self, demand: Iterable[float], prices: Iterable[float] | None = None,
-                 promotions: Iterable[float] | None = None, config: InventoryConfig | None = None):
+                 promotions: Iterable[float] | None = None, config: InventoryConfig | None = None,
+                 reference_stats: dict | None = None):
         self.demand = np.maximum(np.asarray(list(demand), dtype=np.float32), 0)
         if len(self.demand) < 10:
             raise ValueError("At least 10 chronological demand observations are required.")
@@ -42,6 +43,10 @@ class InventoryEnv:
         self.config = config or InventoryConfig()
         self.mean_demand = max(float(np.mean(self.demand)), 1.0)
         self.mean_price = max(float(np.mean(self.prices)), 0.01)
+        if reference_stats is not None:
+            self.mean_demand = reference_stats['mean_demand']
+            self.mean_price = reference_stats['mean_price']
+        self.reference_stats = dict(mean_demand=self.mean_demand, mean_price=self.mean_price)
         self.reward_scale = self.mean_demand * self.mean_price
         self.max_inventory = self.config.max_inventory_days * self.mean_demand
         # With 11 actions this makes the largest order roughly two days of mean
@@ -53,7 +58,7 @@ class InventoryEnv:
     @property
     def state_size(self) -> int:
         # inventory, pipeline, 3 demand lags, rolling mean, price, promotion, weekday
-        return 9
+        return 9 + self.config.lead_time
 
     @property
     def action_size(self) -> int:
@@ -81,9 +86,10 @@ class InventoryEnv:
             recent[-2] / self.mean_demand,
             recent[-3] / self.mean_demand,
             np.mean(recent) / self.mean_demand,
-            self.prices[i] / max(float(np.mean(self.prices)), 0.01),
+            self.prices[i] / self.mean_price,
             self.promotions[i],
             weekday,
+            *[quantity / self.max_inventory for quantity in self.pipeline],
         ], dtype=np.float32)
 
     def step(self, action: int):

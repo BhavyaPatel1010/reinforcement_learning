@@ -4,6 +4,32 @@ This project learns a daily grocery replenishment policy from historical demand.
 
 ## Methods implemented
 
+### Improved training and evaluation
+
+The DQN implementation now uses Double DQN targets, gradient clipping, and an
+exploration schedule that reaches its minimum during training. Its observation
+includes quantities due on each delivery day. Q-learning remains the second RL
+method and uses a compact, aggregated state.
+
+The chronological split is 70% training, 15% validation, and 15% test. Every ten
+episodes, a greedy policy is evaluated on validation data; the best validation
+checkpoint is selected. Test data never selects the checkpoint. Normalization,
+inventory capacity, and order quantities are fitted on training data and reused
+unchanged for validation and test. Learning curves use actual episode counts.
+
+Outputs now also include `dqn_model.pt`, `q_table.json`, and per-episode training
+CSVs. Use a new output folder when comparing with an earlier run. Old reported
+results are not directly comparable because the previous evaluation computed
+scales from the test period itself. Run several seeds before claiming a robust
+performance improvement.
+
+Interpret `total_profit` as a simulated, penalty-adjusted operating objective:
+it subtracts a stock-out penalty as well as monetary costs. Initial stock is
+provided without acquisition cost, terminal inventory has no salvage credit,
+and the dataset is synthetic. `stockout_rate` measures unmet units divided by
+requested units, not the proportion of days with a stock-out. The weekday
+feature is a sequence-index proxy rather than a parsed calendar weekday.
+
 | Method | Purpose |
 |---|---|
 | Reorder-point policy | Non-RL business baseline for a fair comparison |
